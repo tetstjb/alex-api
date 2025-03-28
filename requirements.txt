@@ -1,2 +1,4 @@
 Flask
-dnspython
+mechanize
+beautifulsoup4
+user-agent
