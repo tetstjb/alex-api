@@ -1,4 +1,4 @@
 Flask
 beautifulsoup4
 user-agent
-mechanize
+requests
