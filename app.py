@@ -6,35 +6,41 @@ from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
 
-GMAIL_RECOVERY_URL = "https://accounts.google.com/v3/signin/recoveryidentifier?checkConnection=youtube:511&checkedDomains=youtube&ddm=0&dsh=S-418804429:1719166987007523&flowName=WebLiteSignIn&hl=en&pstMsg=1&service=mail"
-
+GMAIL_RECOVERY_URL = "https://accounts.google.com/_/signup/recovery/identifier"
 
 def check_gmail_availability(email):
     headers = {
-        'User-Agent': generate_user_agent(),
-        'Accept-Language': 'en-US,en;q=0.9'
+        "User-Agent": generate_user_agent(),
+        "Accept-Language": "en-US,en;q=0.9",
+        "Content-Type": "application/json"
     }
     
     session = requests.Session()
-    response = session.get(GMAIL_RECOVERY_URL, headers=headers)
     
+    # First request to initialize session
+    response = session.get(GMAIL_RECOVERY_URL, headers=headers)
     if response.status_code != 200:
         return {"email": email, "status": "Error", "message": "Failed to load Google page"}
     
-    if len(email.split("@")[0]) >= 6 and "_" not in email:
-        data = {
-            'identifier': email
-        }
-        
-        response = session.post(GMAIL_RECOVERY_URL, headers=headers, data=data)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        if "Couldn’t find your Google Account" in soup.get_text():
-            return {"email": email, "status": "Available"}
-        else:
-            return {"email": email, "status": "Not Available"}
-    else:
+    # Check if email format is valid
+    if len(email.split("@")[0]) < 6 or "_" in email:
         return {"email": email, "status": "Bad format or too short"}
+    
+    # Send POST request with the email
+    json_data = {"identifier": email}
+    response = session.post(GMAIL_RECOVERY_URL, headers=headers, json=json_data)
+    
+    # Parse response
+    soup = BeautifulSoup(response.text, 'html.parser')
+    page_text = soup.get_text()
+
+    # Improved response detection
+    if "Couldn’t find your Google Account" in page_text or "Find your email" in page_text:
+        return {"email": email, "status": "Available"}
+    elif "Try another way" in page_text or "Enter the last password you remember" in page_text:
+        return {"email": email, "status": "Not Available"}
+    else:
+        return {"email": email, "status": "Unknown", "message": page_text}
 
 
 @app.route('/check-email', methods=['POST'])
